@@ -18,6 +18,6 @@
         "nategood/httpful": "^0.2.20"
     },
     "autoload": {
-        "psr-4": {"Apruvd\\": "src/"}
+        "psr-4": {"Apruvd\\V4\\": "src/"}
     }
 }
