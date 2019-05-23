@@ -1,6 +1,6 @@
 {
     "name": "apruvd/php_sdk_v4",
-    "description": "PHP SDK for the Apruvd API",
+    "description": "Lightweight PHP SDK for integrating with the Apruvd API v4.",
     "type": "library",
     "authors": [
         {
@@ -11,7 +11,7 @@
     "repositories": [
         {
             "type": "vcs",
-            "url": "https://gitlab.com/apruvd/apruvd_v4_php"
+	    "url": "https://github.com/apruvd/apruvd-php-v4.git"
         }
     ],
     "require": {
