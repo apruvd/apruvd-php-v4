@@ -11,7 +11,7 @@
     "repositories": [
         {
             "type": "vcs",
-            "url": "https://gitlab.com/apruvd/apruvd_php"
+            "url": "https://gitlab.com/apruvd/apruvd_v4_php"
         }
     ],
     "require": {
