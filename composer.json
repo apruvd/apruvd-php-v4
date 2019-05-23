@@ -1,5 +1,5 @@
 {
-    "name": "apruvd/php_sdk",
+    "name": "apruvd/php_sdk_v4",
     "description": "PHP SDK for the Apruvd API",
     "type": "library",
     "authors": [
