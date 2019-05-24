@@ -28,29 +28,42 @@ use Httpful\Mime;
 class APIService{
 
     /**
-     * @var null
-     */
-    protected $http = null;
-    /**
-     * @var string
+     * @var string $host
      */
     private $host = 'https://v4-dev.apruvd.com/';
+    /**
+     * @var string $merchant_id
+     */
+    private $merchant_id = '';
+    /**
+     * @var string $key_id
+     */
+    private $key_id = '';
+    /**
+     * @var string $key_secret
+     */
+    private $key_secret = '';
+    /**
+     * @var string $refresh_token
+     */
+    private $refresh_token = '';
+    /**
+     * @var string $token
+     */
+    private $token = '';
 
-    private $merchant_id = ''; // string
-    private $key_id = ''; // string
-    private $key_secret = ''; // string
-    private $token = ''; // string
-    private $refresh_token = ''; // string
-
+    /**
+     * @var $last_response
+     */
     private $last_response = null;
 
     /**
      * APIService constructor.
-     * @param $merchant_id
-     * @param $key_id
-     * @param $key_secret
-     * @param null $refresh_token
-     * @param null $token
+     * @param string $merchant_id
+     * @param string $key_id
+     * @param string $key_secret
+     * @param string|null $refresh_token
+     * @param string|null $token
      */
     public function __construct($merchant_id, $key_id, $key_secret, $refresh_token = null, $token = null)
     {
@@ -79,22 +92,48 @@ class APIService{
         }
     }
 
+    /**
+     * Token setter.
+     * @param string $token
+     */
     public function setToken($token){
         if(is_string($token) && !empty($token)){
             $this->token = $token;
         }
     }
-
+    /**
+     * Token getter.
+     */
+    public function getToken(){
+        return $this->token;
+    }
+    /**
+     * Refresh Token setter.
+     * @param string $token
+     */
     public function setRefreshToken($token){
         if(is_string($token) && !empty($token)){
             $this->refresh_token = $token;
         }
     }
+    /**
+     * Refresh Token getter.
+     */
+    public function getRefreshToken(){
+        return $this->refresh_token;
+    }
 
+    /**
+     * API failure response getter.
+     */
     public function lastResponse(){
         return $this->last_response;
     }
 
+    /**
+     * Read single Merchant by ID.
+     * @param string $id
+     */
     public function readMerchants($id){
         $uri = "accounts/merchants/{$id}/";
         $response = \Httpful\Request::get($this->host.$uri)
@@ -107,6 +146,9 @@ class APIService{
         return null;
     }
 
+    /**
+     * Create access token from refresh token.
+     */
     public function createMerchantAccessToken(){
         $uri = "accounts/merchants/access_tokens/";
         $response = \Httpful\Request::post($this->host.$uri, '')
@@ -119,6 +161,9 @@ class APIService{
         return null;
     }
 
+    /**
+     * Create refresh token from auth credentials.
+     */
     public function createMerchantRefreshToken(){
         $uri = "accounts/merchants/refresh_tokens/";
         $response = \Httpful\Request::post($this->host.$uri, '')
@@ -132,6 +177,11 @@ class APIService{
         return null;
     }
 
+    /**
+     * List Webhook API Keys.
+     * @param int $page
+     * @param int $page_size
+     */
     public function listWebhookAPIKeys($page, $page_size){
         $uri = "accounts/webhooks/api_keys/?page={$page}&page_size={$page_size}";
         $response = \Httpful\Request::get($this->host.$uri)
@@ -144,6 +194,10 @@ class APIService{
         return null;
     }
 
+    /**
+     * Create Webhook API Key.
+     * @param WebhookAPIKey $webhook_api_key
+     */
     public function createWebhookAPIKey(WebhookAPIKey $webhook_api_key){
         $uri = "accounts/webhooks/api_keys/";
         $response = \Httpful\Request::post($this->host.$uri, json_encode($webhook_api_key))
@@ -156,6 +210,10 @@ class APIService{
         return null;
     }
 
+    /**
+     * Read single Webhook API Key by ID.
+     * @param string $id
+     */
     public function readWebhookAPIKey($id){
         $uri = "accounts/webhooks/api_keys/{$id}/";
         $response = \Httpful\Request::get($this->host.$uri)
@@ -168,6 +226,11 @@ class APIService{
         return null;
     }
 
+    /**
+     * Overwrite single Webhook API Key by ID.
+     * @param string $id
+     * @param WebhookAPIKey $webhook_api_key
+     */
     public function updateWebhookAPIKey($id, WebhookAPIKey $webhook_api_key){
         $uri = "accounts/webhooks/api_keys/{$id}/";
         $response = \Httpful\Request::put($this->host.$uri, json_encode($webhook_api_key))
@@ -180,6 +243,11 @@ class APIService{
         return null;
     }
 
+    /**
+     * Update partial single Webhook API Key by ID.
+     * @param string $id
+     * @param WebhookAPIKey $webhook_api_key
+     */
     public function partialUpdateWebhookAPIKey($id, WebhookAPIKey $webhook_api_key){
         $uri = "accounts/webhooks/api_keys/{$id}/";
         $response = \Httpful\Request::patch($this->host.$uri, json_encode($webhook_api_key))
@@ -192,6 +260,9 @@ class APIService{
         return null;
     }
 
+    /**
+     * Delete single Webhook API Key by ID.
+     */
     public function deleteWebhookAPIKey($id){
         $uri = "accounts/webhooks/api_keys/{$id}/";
         $response = \Httpful\Request::delete($this->host.$uri)
@@ -205,6 +276,11 @@ class APIService{
         return null;
     }
 
+    /**
+     * List Webhooks.
+     * @param int $page
+     * @param int $page_size
+     */
     public function listWebhooks($page, $page_size){
         $uri = "accounts/webhooks/?page={$page}&page_size={$page_size}";
         $response = \Httpful\Request::get($this->host.$uri)
@@ -217,6 +293,10 @@ class APIService{
         return null;
     }
 
+    /**
+     * Create Webhook.
+     * @param Webhook $webhook
+     */
     public function createWebhook(Webhook $webhook){
         $uri = "accounts/webhooks/";
         $response = \Httpful\Request::post($this->host.$uri, json_encode($webhook))
@@ -229,6 +309,10 @@ class APIService{
         return null;
     }
 
+    /**
+     * Read single Webhook by ID.
+     * @param string $id
+     */
     public function readWebhook($id){
         $uri = "accounts/webhooks/{$id}/";
         $response = \Httpful\Request::get($this->host.$uri)
@@ -241,6 +325,11 @@ class APIService{
         return null;
     }
 
+    /**
+     * Overwrite single Webhook by ID.
+     * @param string $id
+     * @param Webhook $webhook
+     */
     public function updateWebhook($id, Webhook $webhook){
         $uri = "accounts/webhooks/{$id}/";
         $response = \Httpful\Request::put($this->host.$uri, json_encode($webhook))
@@ -253,6 +342,11 @@ class APIService{
         return null;
     }
 
+    /**
+     * Update partial single Webhook by ID.
+     * @param string $id
+     * @param Webhook $webhook
+     */
     public function partialUpdateWebhook($id, Webhook $webhook){
         $uri = "accounts/webhooks/{$id}/";
         $response = \Httpful\Request::patch($this->host.$uri, json_encode($webhook))
@@ -265,6 +359,9 @@ class APIService{
         return null;
     }
 
+    /**
+     * Delete single Webhook API Key by ID.
+     */
     public function deleteWebhook($id){
         $uri = "accounts/webhooks/{$id}/";
         $response = \Httpful\Request::delete($this->host.$uri)
@@ -277,6 +374,10 @@ class APIService{
         return null;
     }
 
+    /**
+     * Create Transaction.
+     * @param Transaction $transaction
+     */
     public function createTransaction(Transaction $transaction){
         $uri = "transactions/";
         $response = \Httpful\Request::post($this->host.$uri, json_encode($transaction))
@@ -289,6 +390,10 @@ class APIService{
         return null;
     }
 
+    /**
+     * Read single Transaction (Order) by ID.
+     * @param string $id
+     */
     public function readOrderByID($id){
         $uri = "transactions/by_order_id/{$id}/";
         $response = \Httpful\Request::get($this->host.$uri)
@@ -301,6 +406,11 @@ class APIService{
         return null;
     }
 
+    /**
+     * Overwrite single Transaction (Order) by ID.
+     * @param string $id
+     * @param Transaction $transaction
+     */
     public function updateOrderByID($id, Transaction $transaction){
         $uri = "transactions/by_order_id/{$id}/";
         $response = \Httpful\Request::put($this->host.$uri, json_encode($transaction))
@@ -313,6 +423,11 @@ class APIService{
         return null;
     }
 
+    /**
+     * Update partial single Transaction (Order) by ID.
+     * @param string $id
+     * @param Transaction $transaction
+     */
     public function partialUpdateOrderByID($id, Transaction $transaction){
         $uri = "transactions/by_order_id/{$id}/";
         $response = \Httpful\Request::patch($this->host.$uri, json_encode($transaction))
@@ -325,6 +440,10 @@ class APIService{
         return null;
     }
 
+    /**
+     * Create Session.
+     * @param Session $session
+     */
     public function createSession(Session $session){
         $uri = "transactions/sessions/";
         $response = \Httpful\Request::post($this->host.$uri, json_encode($session))
@@ -337,6 +456,11 @@ class APIService{
         return null;
     }
 
+    /**
+     * Overwrite single Session by ID.
+     * @param string $id
+     * @param Session $session
+     */
     public function updateSession($id, Session $session){
         $uri = "transactions/sessions/{$id}/";
         $response = \Httpful\Request::put($this->host.$uri, json_encode($session))
@@ -349,6 +473,11 @@ class APIService{
         return null;
     }
 
+    /**
+     * Update partial single Session by ID.
+     * @param string $id
+     * @param Session $session
+     */
     public function partialUpdateSession($id, Session $session){
         $uri = "transactions/sessions/{$id}/";
         $response = \Httpful\Request::patch($this->host.$uri, json_encode($session))
