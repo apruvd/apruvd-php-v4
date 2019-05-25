@@ -37,7 +37,7 @@ class APIResponse{
 
     /**
      * APIResponse constructor.
-     * @param Response $response
+     * @param Response|Object $response
      */
     public function __construct(Response $response = null)
     {
