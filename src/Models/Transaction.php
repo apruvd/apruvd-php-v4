@@ -288,6 +288,11 @@ class Transaction extends APIModel{
     protected $number_fields = ['total'];
 
     /**
+     * @var array $required_fields
+     */
+    protected $required_fields = ['order_id', 'total'];
+
+    /**
      * @var array $string_fields
      */
     protected $string_fields = [

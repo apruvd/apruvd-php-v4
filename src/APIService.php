@@ -6,6 +6,7 @@ use Apruvd\V4\Models\Session;
 use Apruvd\V4\Models\Transaction;
 use Apruvd\V4\Models\Webhook;
 use Apruvd\V4\Models\WebhookAPIKey;
+use Apruvd\V4\Responses\APIResponse;
 use Apruvd\V4\Responses\CreateMerchantAccessTokenResponse;
 use Apruvd\V4\Responses\CreateMerchantRefeshTokenResponse;
 use Apruvd\V4\Responses\CreateSessionResponse;
@@ -19,7 +20,9 @@ use Apruvd\V4\Responses\ListWebhooksResponse;
 use Apruvd\V4\Responses\ReadMerchantsResponse;
 use Apruvd\V4\Responses\ReadWebhookAPIKeyResponse;
 use Apruvd\V4\Responses\UpsertWebhookAPIKeyResponse;
+use Closure;
 use Httpful\Mime;
+use Httpful\Request;
 
 /**
  * Class APIService
@@ -53,9 +56,11 @@ class APIService{
     private $token = '';
 
     /**
-     * @var $last_response
+     * @var Closure $token_update_callback
      */
-    private $last_response = null;
+    private $token_update_callback = null;
+
+    private $token_retry_attempted = false;
 
     /**
      * APIService constructor.
@@ -72,24 +77,6 @@ class APIService{
         $this->key_secret = $key_secret;
         $this->refresh_token = $refresh_token;
         $this->token = $token;
-
-        if(!empty($this->token)){
-            // try preflight request?
-            // Yeah, do the self merchant detail
-
-            // check for 403 code
-            // {"detail":"Invalid or expired access token"}
-
-            if(!empty($this->refresh_token)){
-
-            }
-        }
-        elseif(!empty($this->refresh_token)){
-
-        }
-        else{
-            // Authenticate
-        }
     }
 
     /**
@@ -103,6 +90,7 @@ class APIService{
     }
     /**
      * Token getter.
+     * @return string
      */
     public function getToken(){
         return $this->token;
@@ -118,376 +106,443 @@ class APIService{
     }
     /**
      * Refresh Token getter.
+     * @return string
      */
     public function getRefreshToken(){
         return $this->refresh_token;
     }
 
     /**
-     * API failure response getter.
-     */
-    public function lastResponse(){
-        return $this->last_response;
-    }
-
-    /**
      * Read single Merchant by ID.
      * @param string $id
+     * @return ReadMerchantsResponse;
      */
     public function readMerchants($id){
         $uri = "accounts/merchants/{$id}/";
-        $response = \Httpful\Request::get($this->host.$uri)
-            ->addHeader('Authorization', 'Bearer '.$this->token)->sendsAndExpects(Mime::JSON)->send();
-
-        $this->last_response = $response;
-        if($response->code >=200 && $response->code < 300){
-            return new ReadMerchantsResponse($response->body);
+        $response = \Httpful\Request::get($this->host.$uri);
+        $response = $this->bindAuthorization($response);
+        $response = $response->sends(Mime::JSON)->send();
+        $apiResponse = new ReadMerchantsResponse($response);
+        if($this->retryNewToken($apiResponse)){
+            $apiResponse = $this->readMerchants($id);
         }
-        return null;
+        return $apiResponse;
     }
 
     /**
      * Create access token from refresh token.
+     * @return CreateMerchantAccessTokenResponse
      */
     public function createMerchantAccessToken(){
         $uri = "accounts/merchants/access_tokens/";
         $response = \Httpful\Request::post($this->host.$uri, '')
-            ->addHeader('Authorization', 'Bearer '.$this->refresh_token)->sendsAndExpects(Mime::JSON)->send();
-
-        $this->last_response = $response;
-        if($response->code >=200 && $response->code < 300){
-            return new CreateMerchantAccessTokenResponse($response->body);
+            ->addHeader('Authorization', 'Bearer '.$this->refresh_token)
+            ->sends(Mime::JSON)->send();
+        $token = new CreateMerchantAccessTokenResponse($response);
+        if($token->success){
+            $this->token = $token->token;
+            if(is_object($this->token_update_callback) && ($this->token_update_callback instanceof Closure)){
+                call_user_func_array($this->token_update_callback, [$token]);
+            }
         }
-        return null;
+        return $token;
+    }
+
+    /**
+     * Create access token from refresh token.
+     * @param Closure $callback
+     */
+    public function onAccessTokenUpdate(Closure $callback){
+        $this->token_update_callback = $callback;
     }
 
     /**
      * Create refresh token from auth credentials.
+     * @return CreateMerchantRefeshTokenResponse
      */
     public function createMerchantRefreshToken(){
         $uri = "accounts/merchants/refresh_tokens/";
         $response = \Httpful\Request::post($this->host.$uri, '')
             ->addHeader('Authorization', 'Basic '.base64_encode($this->key_id.':'.$this->key_secret))
-            ->sendsAndExpects(Mime::JSON)->send();
-
-        $this->last_response = $response;
-        if($response->code >=200 && $response->code < 300){
-            return new CreateMerchantRefeshTokenResponse($response->body);
+            ->sends(Mime::JSON)->send();
+        $token = new CreateMerchantRefeshTokenResponse($response);
+        if($token->success){
+            $this->refresh_token = $token->token;
         }
-        return null;
+        return $token;
     }
 
     /**
      * List Webhook API Keys.
      * @param int $page
      * @param int $page_size
+     * @return ListWebhookAPIKeysResponse
      */
     public function listWebhookAPIKeys($page, $page_size){
         $uri = "accounts/webhooks/api_keys/?page={$page}&page_size={$page_size}";
-        $response = \Httpful\Request::get($this->host.$uri)
-            ->addHeader('Authorization', 'Bearer '.$this->token)->sendsAndExpects(Mime::JSON)->send();
-
-        $this->last_response = $response;
-        if($response->code >=200 && $response->code < 300){
-            return new ListWebhookAPIKeysResponse($response->body);
+        $response = \Httpful\Request::get($this->host.$uri);
+        $response = $this->bindAuthorization($response);
+        $response = $response->sends(Mime::JSON)->send();
+        $apiResponse = new ListWebhookAPIKeysResponse($response);
+        if($this->retryNewToken($apiResponse)){
+            $apiResponse = $this->listWebhookAPIKeys($page, $page_size);
         }
-        return null;
+        return $apiResponse;
     }
 
     /**
      * Create Webhook API Key.
      * @param WebhookAPIKey $webhook_api_key
+     * @return UpsertWebhookAPIKeyResponse
      */
     public function createWebhookAPIKey(WebhookAPIKey $webhook_api_key){
         $uri = "accounts/webhooks/api_keys/";
-        $response = \Httpful\Request::post($this->host.$uri, json_encode($webhook_api_key))
-            ->addHeader('Authorization', 'Bearer '.$this->token)->sendsAndExpects(Mime::JSON)->send();
-
-        $this->last_response = $response;
-        if($response->code >=200 && $response->code < 300){
-            return new UpsertWebhookAPIKeyResponse($response->body);
+        $response = \Httpful\Request::post($this->host.$uri, json_encode($webhook_api_key));
+        $response = $this->bindAuthorization($response);
+        $response = $response->sends(Mime::JSON)->send();
+        $apiResponse = new UpsertWebhookAPIKeyResponse($response);
+        if($this->retryNewToken($apiResponse)){
+            $apiResponse = $this->createWebhookAPIKey($webhook_api_key);
         }
-        return null;
+        return $apiResponse;
     }
 
     /**
      * Read single Webhook API Key by ID.
      * @param string $id
+     * @return ReadWebhookAPIKeyResponse
      */
     public function readWebhookAPIKey($id){
         $uri = "accounts/webhooks/api_keys/{$id}/";
-        $response = \Httpful\Request::get($this->host.$uri)
-            ->addHeader('Authorization', 'Bearer '.$this->token)->sendsAndExpects(Mime::JSON)->send();
-
-        $this->last_response = $response;
-        if($response->code >=200 && $response->code < 300){
-            return new ReadWebhookAPIKeyResponse($response->body);
+        $response = \Httpful\Request::get($this->host.$uri);
+        $response = $this->bindAuthorization($response);
+        $response = $response->sends(Mime::JSON)->send();
+        $apiResponse = new ReadWebhookAPIKeyResponse($response);
+        if($this->retryNewToken($apiResponse)){
+            $apiResponse = $this->readWebhookAPIKey($id);
         }
-        return null;
+        return $apiResponse;
     }
 
     /**
      * Overwrite single Webhook API Key by ID.
      * @param string $id
      * @param WebhookAPIKey $webhook_api_key
+     * @return UpsertWebhookAPIKeyResponse
      */
     public function updateWebhookAPIKey($id, WebhookAPIKey $webhook_api_key){
         $uri = "accounts/webhooks/api_keys/{$id}/";
-        $response = \Httpful\Request::put($this->host.$uri, json_encode($webhook_api_key))
-            ->addHeader('Authorization', 'Bearer '.$this->token)->sendsAndExpects(Mime::JSON)->send();
-
-        $this->last_response = $response;
-        if($response->code >=200 && $response->code < 300){
-            return new UpsertWebhookAPIKeyResponse($response->body);
+        $response = \Httpful\Request::put($this->host.$uri, json_encode($webhook_api_key));
+        $response = $this->bindAuthorization($response);
+        $response = $response->sends(Mime::JSON)->send();
+        $apiResponse = new UpsertWebhookAPIKeyResponse($response);
+        if($this->retryNewToken($apiResponse)){
+            $apiResponse = $this->updateWebhookAPIKey($id, $webhook_api_key);
         }
-        return null;
+        return $apiResponse;
     }
 
     /**
      * Update partial single Webhook API Key by ID.
      * @param string $id
      * @param WebhookAPIKey $webhook_api_key
+     * @return UpsertWebhookAPIKeyResponse
      */
     public function partialUpdateWebhookAPIKey($id, WebhookAPIKey $webhook_api_key){
         $uri = "accounts/webhooks/api_keys/{$id}/";
-        $response = \Httpful\Request::patch($this->host.$uri, json_encode($webhook_api_key))
-            ->addHeader('Authorization', 'Bearer '.$this->token)->sendsAndExpects(Mime::JSON)->send();
-
-        $this->last_response = $response;
-        if($response->code >=200 && $response->code < 300){
-            return new UpsertWebhookAPIKeyResponse($response->body);
+        $response = \Httpful\Request::patch($this->host.$uri, json_encode($webhook_api_key));
+        $response = $this->bindAuthorization($response);
+        $response = $response->sends(Mime::JSON)->send();
+        $apiResponse = new UpsertWebhookAPIKeyResponse($response);
+        if($this->retryNewToken($apiResponse)){
+            $apiResponse = $this->partialUpdateWebhookAPIKey($id, $webhook_api_key);
         }
-        return null;
+        return $apiResponse;
     }
 
     /**
      * Delete single Webhook API Key by ID.
+     * @return APIResponse
      */
     public function deleteWebhookAPIKey($id){
         $uri = "accounts/webhooks/api_keys/{$id}/";
-        $response = \Httpful\Request::delete($this->host.$uri)
-            ->addHeader('Authorization', 'Bearer '.$this->token)->sendsAndExpects(Mime::JSON)->send();
-
-        $this->last_response = $response;
-        if($response->code >=200 && $response->code < 300){
-            // returns null anyway
-            return true;
+        $response = \Httpful\Request::delete($this->host.$uri);
+        $response = $this->bindAuthorization($response);
+        $response = $response->sends(Mime::JSON)->send();
+        $apiResponse = new APIResponse($response);
+        if($this->retryNewToken($apiResponse)){
+            $apiResponse = $this->deleteWebhookAPIKey($id);
         }
-        return null;
+        return $apiResponse;
     }
 
     /**
      * List Webhooks.
      * @param int $page
      * @param int $page_size
+     * @return ListWebhooksResponse
      */
     public function listWebhooks($page, $page_size){
         $uri = "accounts/webhooks/?page={$page}&page_size={$page_size}";
-        $response = \Httpful\Request::get($this->host.$uri)
-            ->addHeader('Authorization', 'Bearer '.$this->token)->sendsAndExpects(Mime::JSON)->send();
-
-        $this->last_response = $response;
-        if($response->code >=200 && $response->code < 300){
-            return new ListWebhooksResponse($response->body);
+        $response = \Httpful\Request::get($this->host.$uri);
+        $response = $this->bindAuthorization($response);
+        $response = $response->sends(Mime::JSON)->send();
+        $apiResponse = new ListWebhooksResponse($response);
+        if($this->retryNewToken($apiResponse)){
+            $apiResponse = $this->listWebhooks($page, $page_size);
         }
-        return null;
+        return $apiResponse;
     }
 
     /**
      * Create Webhook.
      * @param Webhook $webhook
+     * @return UpsertWebhookResponse
      */
     public function createWebhook(Webhook $webhook){
         $uri = "accounts/webhooks/";
-        $response = \Httpful\Request::post($this->host.$uri, json_encode($webhook))
-            ->addHeader('Authorization', 'Bearer '.$this->token)->sendsAndExpects(Mime::JSON)->send();
-
-        $this->last_response = $response;
-        if($response->code >=200 && $response->code < 300){
-            return new UpsertWebhookResponse($response->body);
+        $response = \Httpful\Request::post($this->host.$uri, json_encode($webhook));
+        $response = $this->bindAuthorization($response);
+        $response = $response->sends(Mime::JSON)->send();
+        $apiResponse = new UpsertWebhookResponse($response);
+        if($this->retryNewToken($apiResponse)){
+            $apiResponse = $this->createWebhook($webhook);
         }
-        return null;
+        return $apiResponse;
     }
 
     /**
      * Read single Webhook by ID.
      * @param string $id
+     * @return ReadWebhookResponse
      */
     public function readWebhook($id){
         $uri = "accounts/webhooks/{$id}/";
-        $response = \Httpful\Request::get($this->host.$uri)
-            ->addHeader('Authorization', 'Bearer '.$this->token)->sendsAndExpects(Mime::JSON)->send();
-
-        $this->last_response = $response;
-        if($response->code >=200 && $response->code < 300){
-            return new ReadWebhookResponse($response->body);
+        $response = \Httpful\Request::get($this->host.$uri);
+        $response = $this->bindAuthorization($response);
+        $response = $response->sends(Mime::JSON)->send();
+        $apiResponse = new ReadWebhookResponse($response);
+        if($this->retryNewToken($apiResponse)){
+            $apiResponse = $this->readWebhook($id);
         }
-        return null;
+        return $apiResponse;
     }
 
     /**
      * Overwrite single Webhook by ID.
      * @param string $id
      * @param Webhook $webhook
+     * @return UpsertWebhookResponse
      */
     public function updateWebhook($id, Webhook $webhook){
         $uri = "accounts/webhooks/{$id}/";
-        $response = \Httpful\Request::put($this->host.$uri, json_encode($webhook))
-            ->addHeader('Authorization', 'Bearer '.$this->token)->sendsAndExpects(Mime::JSON)->send();
-
-        $this->last_response = $response;
-        if($response->code >=200 && $response->code < 300){
-            return new UpsertWebhookResponse($response->body);
+        $response = \Httpful\Request::put($this->host.$uri, json_encode($webhook));
+        $response = $this->bindAuthorization($response);
+        $response = $response->sends(Mime::JSON)->send();
+        $apiResponse = new UpsertWebhookResponse($response);
+        if($this->retryNewToken($apiResponse)){
+            $apiResponse = $this->updateWebhook($id, $webhook);
         }
-        return null;
+        return $apiResponse;
     }
 
     /**
      * Update partial single Webhook by ID.
      * @param string $id
      * @param Webhook $webhook
+     * @return UpsertWebhookResponse
      */
     public function partialUpdateWebhook($id, Webhook $webhook){
         $uri = "accounts/webhooks/{$id}/";
-        $response = \Httpful\Request::patch($this->host.$uri, json_encode($webhook))
-            ->addHeader('Authorization', 'Bearer '.$this->token)->sendsAndExpects(Mime::JSON)->send();
-
-        $this->last_response = $response;
-        if($response->code >=200 && $response->code < 300){
-            return new UpsertWebhookResponse($response->body);
+        $response = \Httpful\Request::patch($this->host.$uri, json_encode($webhook));
+        $response = $this->bindAuthorization($response);
+        $response = $response->sends(Mime::JSON)->send();
+        $apiResponse = new UpsertWebhookResponse($response);
+        if($this->retryNewToken($apiResponse)){
+            $apiResponse = $this->partialUpdateWebhook($id, $webhook);
         }
-        return null;
+        return $apiResponse;
     }
 
     /**
      * Delete single Webhook API Key by ID.
+     * @return APIResponse
      */
     public function deleteWebhook($id){
         $uri = "accounts/webhooks/{$id}/";
-        $response = \Httpful\Request::delete($this->host.$uri)
-            ->addHeader('Authorization', 'Bearer '.$this->token)->sendsAndExpects(Mime::JSON)->send();
-
-        $this->last_response = $response;
-        if($response->code >=200 && $response->code < 300){
-            return true;
+        $response = \Httpful\Request::delete($this->host.$uri);
+        $response = $this->bindAuthorization($response);
+        $response = $response->sends(Mime::JSON)->send();
+        $apiResponse = new APIResponse($response);
+        if($this->retryNewToken($apiResponse)){
+            $apiResponse = $this->deleteWebhook($id);
         }
-        return null;
+        return $apiResponse;
     }
 
     /**
      * Create Transaction.
      * @param Transaction $transaction
+     * @return UpsertTransactionResponse
      */
     public function createTransaction(Transaction $transaction){
         $uri = "transactions/";
-        $response = \Httpful\Request::post($this->host.$uri, json_encode($transaction))
-            ->addHeader('Authorization', 'Bearer '.$this->token)->sendsAndExpects(Mime::JSON)->send();
-
-        $this->last_response = $response;
-        if($response->code >=200 && $response->code < 300){
-            return new UpsertTransactionResponse($response->body);
+        $response = \Httpful\Request::post($this->host.$uri, json_encode($transaction));
+        $response = $this->bindAuthorization($response);
+        $response = $response->sends(Mime::JSON)->send();
+        $apiResponse = new UpsertTransactionResponse($response);
+        if($this->retryNewToken($apiResponse)){
+            $apiResponse = $this->createTransaction($transaction);
         }
-        return null;
+        return $apiResponse;
     }
 
     /**
      * Read single Transaction (Order) by ID.
      * @param string $id
+     * @return ReadTransactionResponse
      */
     public function readOrderByID($id){
         $uri = "transactions/by_order_id/{$id}/";
-        $response = \Httpful\Request::get($this->host.$uri)
-            ->addHeader('Authorization', 'Bearer '.$this->token)->sendsAndExpects(Mime::JSON)->send();
-
-        $this->last_response = $response;
-        if($response->code >=200 && $response->code < 300){
-            return new ReadTransactionResponse($response->body);
+        $response = \Httpful\Request::get($this->host.$uri);
+        $response = $this->bindAuthorization($response);
+        $response = $response->sends(Mime::JSON)->send();
+        $apiResponse = new ReadTransactionResponse($response);
+        if($this->retryNewToken($apiResponse)){
+            $apiResponse = $this->readOrderByID($id);
         }
-        return null;
+        return $apiResponse;
     }
 
     /**
      * Overwrite single Transaction (Order) by ID.
      * @param string $id
      * @param Transaction $transaction
+     * @return UpsertTransactionResponse
      */
     public function updateOrderByID($id, Transaction $transaction){
         $uri = "transactions/by_order_id/{$id}/";
-        $response = \Httpful\Request::put($this->host.$uri, json_encode($transaction))
-            ->addHeader('Authorization', 'Bearer '.$this->token)->sendsAndExpects(Mime::JSON)->send();
-
-        $this->last_response = $response;
-        if($response->code >=200 && $response->code < 300){
-            return new UpsertTransactionResponse($response->body);
+        $response = \Httpful\Request::put($this->host.$uri, json_encode($transaction));
+        $response = $this->bindAuthorization($response);
+        $response = $response->sends(Mime::JSON)->send();
+        $apiResponse = new UpsertTransactionResponse($response);
+        if($this->retryNewToken($apiResponse)){
+            $apiResponse = $this->updateOrderByID($id, $transaction);
         }
-        return null;
+        return $apiResponse;
     }
 
     /**
      * Update partial single Transaction (Order) by ID.
      * @param string $id
      * @param Transaction $transaction
+     * @return UpsertTransactionResponse
      */
     public function partialUpdateOrderByID($id, Transaction $transaction){
         $uri = "transactions/by_order_id/{$id}/";
-        $response = \Httpful\Request::patch($this->host.$uri, json_encode($transaction))
-            ->addHeader('Authorization', 'Bearer '.$this->token)->sendsAndExpects(Mime::JSON)->send();
-
-        $this->last_response = $response;
-        if($response->code >=200 && $response->code < 300){
-            return new UpsertTransactionResponse($response->body);
+        $response = \Httpful\Request::patch($this->host.$uri, json_encode($transaction));
+        $response = $this->bindAuthorization($response);
+        $response = $response->sends(Mime::JSON)->send();
+        $apiResponse = new UpsertTransactionResponse($response);
+        if($this->retryNewToken($apiResponse)){
+            $apiResponse = $this->partialUpdateOrderByID($id, $transaction);
         }
-        return null;
+        return $apiResponse;
     }
 
     /**
      * Create Session.
      * @param Session $session
+     * @return CreateSessionResponse
      */
     public function createSession(Session $session){
         $uri = "transactions/sessions/";
-        $response = \Httpful\Request::post($this->host.$uri, json_encode($session))
-            ->addHeader('Authorization', 'Bearer '.$this->token)->sendsAndExpects(Mime::JSON)->send();
-
-        $this->last_response = $response;
-        if($response->code >=200 && $response->code < 300){
-            return new CreateSessionResponse($response->body);
+        $response = \Httpful\Request::post($this->host.$uri, json_encode($session));
+        $response = $this->bindAuthorization($response);
+        $response = $response->sends(Mime::JSON)->send();
+        $apiResponse = new CreateSessionResponse($response);
+        if($this->retryNewToken($apiResponse)){
+            $apiResponse = $this->createSession($session);
         }
-        return null;
+        return $apiResponse;
     }
 
     /**
      * Overwrite single Session by ID.
      * @param string $id
      * @param Session $session
+     * @return UpsertSessionResponse
      */
     public function updateSession($id, Session $session){
         $uri = "transactions/sessions/{$id}/";
-        $response = \Httpful\Request::put($this->host.$uri, json_encode($session))
-            ->addHeader('Authorization', 'Bearer '.$this->token)->sendsAndExpects(Mime::JSON)->send();
-
-        $this->last_response = $response;
-        if($response->code >=200 && $response->code < 300){
-            return new UpsertSessionResponse($response->body);
+        $response = \Httpful\Request::put($this->host.$uri, json_encode($session));
+        $response = $this->bindAuthorization($response);
+        $response = $response->sends(Mime::JSON)->send();
+        $apiResponse = new UpsertSessionResponse($response);
+        if($this->retryNewToken($apiResponse)){
+            $apiResponse = $this->updateSession($id, $session);
         }
-        return null;
+        return $apiResponse;
     }
 
     /**
      * Update partial single Session by ID.
      * @param string $id
      * @param Session $session
+     * @return UpsertSessionResponse
      */
     public function partialUpdateSession($id, Session $session){
         $uri = "transactions/sessions/{$id}/";
-        $response = \Httpful\Request::patch($this->host.$uri, json_encode($session))
-            ->addHeader('Authorization', 'Bearer '.$this->token)->sendsAndExpects(Mime::JSON)->send();
-
-        $this->last_response = $response;
-        if($response->code >=200 && $response->code < 300){
-            return new UpsertSessionResponse($response->body);
+        $response = \Httpful\Request::patch($this->host.$uri, json_encode($session));
+        $response = $this->bindAuthorization($response);
+        $response = $response->sends(Mime::JSON)->send();
+        $apiResponse = new UpsertSessionResponse($response);
+        if($this->retryNewToken($apiResponse)){
+            $apiResponse = $this->partialUpdateSession($id, $session);
         }
-        return null;
+        return $apiResponse;
+    }
+
+    /**
+     * Add Auth headers to Httpful request.
+     * @param Request $request
+     * @return Request
+     */
+    protected function bindAuthorization(Request $request){
+        if(!empty($this->token)){
+            $request->addHeader('Authorization', 'Bearer '.$this->token);
+        }
+        elseif(!empty($this->refresh_token)){
+            $token = $this->createMerchantAccessToken();
+            if($token){
+                $this->token = $token->token;
+                $request->addHeader('Authorization', 'Bearer '.$this->token);
+            }
+            else{
+                $request->addHeader('Authorization', 'Basic '.base64_encode($this->key_id.':'.$this->key_secret));
+            }
+        }
+        else{
+            $request->addHeader('Authorization', 'Basic '.base64_encode($this->key_id.':'.$this->key_secret));
+        }
+        return $request;
+    }
+
+    /**
+     * Sniff response for missing/expired Access Token when Refresh Token is known.
+     * @param APIResponse $response
+     * @return boolean
+     */
+    protected function retryNewToken(APIResponse $response){
+        if($response->code == 403 && $response->detail === 'Invalid or expired access token' && !empty($this->refresh_token) && !$this->token_retry_attempted ){
+            // Will trigger onAccessTokenUpdate() callback on success
+            $this->token_retry_attempted = true;
+            $token = $this->createMerchantAccessToken();
+            if($token->success){
+                return true;
+            }
+        }
+        return false;
     }
 
 }
