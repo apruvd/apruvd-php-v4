@@ -2,13 +2,11 @@
 
 namespace Apruvd\V4\Responses\Nested;
 
-use Apruvd\V4\Responses\APIResponse;
-
 /**
  * Class WebookCredentials
  * @package Apruvd\V4\Responses\Nested
  */
-class WebookCredentials extends APIResponse {
+class WebookCredentials extends NestedHydrator {
 
     /**
      * @var string $name

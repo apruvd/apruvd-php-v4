@@ -2,13 +2,11 @@
 
 namespace Apruvd\V4\Responses\Nested;
 
-use Apruvd\V4\Responses\APIResponse;
-
 /**
  * Class PropertyHistory
  * @package Apruvd\V4\Responses\Nested
  */
-class PropertyHistory extends APIResponse {
+class PropertyHistory extends NestedHydrator {
 
     public $disposition = null; // ? null
     /**

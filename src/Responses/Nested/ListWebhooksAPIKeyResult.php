@@ -2,13 +2,11 @@
 
 namespace Apruvd\V4\Responses\Nested;
 
-use Apruvd\V4\Responses\APIResponse;
-
 /**
  * Class ListWebhooksAPIKeyResult
  * @package Apruvd\V4\Responses\Nested
  */
-class ListWebhooksAPIKeyResult extends APIResponse {
+class ListWebhooksAPIKeyResult extends NestedHydrator {
     /**
      * @var string $id
      */
