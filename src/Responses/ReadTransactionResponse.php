@@ -3,8 +3,6 @@
 namespace Apruvd\V4\Responses;
 
 use Apruvd\V4\Models\DiscountCode;
-use Apruvd\V4\Responses\Nested\History;
-use Apruvd\V4\Responses\Nested\PropertyHistory;
 use Apruvd\V4\Responses\Nested\WebhookMerchant;
 
 /**
@@ -283,10 +281,6 @@ class ReadTransactionResponse extends APIResponse{
      * @var array $basic_rules_tripped
      */
     public $basic_rules_tripped = null;
-    /**
-     * @var History $history This is an admin only response. But still possible.
-     */
-    public $history = null;
 
 
     /**
@@ -313,14 +307,6 @@ class ReadTransactionResponse extends APIResponse{
         }
         if(!empty($props->merchant)){
             $this->merchant = new WebhookMerchant($props->merchant);
-        }
-        if(!empty($props->history)){
-            $this->history = new History($props->history);
-            foreach($props->history as $key=>$prop){
-                if(is_object($prop) && isset($prop->times_seen)){
-                    $this->history->{$key} = new PropertyHistory($prop);
-                }
-            }
         }
     }
 }
