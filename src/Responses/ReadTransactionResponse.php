@@ -2,7 +2,6 @@
 
 namespace Apruvd\V4\Responses;
 
-use Apruvd\V4\Models\CartContent;
 use Apruvd\V4\Models\DiscountCode;
 use Apruvd\V4\Responses\Nested\History;
 use Apruvd\V4\Responses\Nested\PropertyHistory;
@@ -285,7 +284,7 @@ class ReadTransactionResponse extends APIResponse{
      */
     public $basic_rules_tripped = null;
     /**
-     * @var History $history
+     * @var History $history This is an admin only response. But still possible.
      */
     public $history = null;
 

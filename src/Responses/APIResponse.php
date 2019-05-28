@@ -25,7 +25,7 @@ class APIResponse{
     public $detail = null;
 
     /**
-     * @var string $success;
+     * @var boolean $success;
      */
     public $success = false;
 
