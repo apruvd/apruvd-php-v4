@@ -1,9 +1,6 @@
-# apruvd_v4_php
+# apruvd-v4-php
 
-Lightweight PHP SDK for integrating with the Apruvd API V4 (soon to be released).
-
-API documentation found here.
-https://v4-dev.apruvd.com/docs/
+Lightweight PHP SDK for integrating with the [Apruvd API v4](https://v4-dev.apruvd.com/docs/)
 
 ## Services
 ### APIService
@@ -14,7 +11,7 @@ $service->{endpoint_method}();
 ```
 
 ### APIAsyncResponseService
-The optional service to grab/transform $_POST JSON data into the appropriate response model. The ```$s```
+The optional service to grab/transform `$_POST JSON` data into the appropriate response model. The ```$s```
 ```
 $callback = function($post_response){ ... };
 \Apruvd\V4\APIAsyncResponseService::handle($callback);
@@ -25,11 +22,13 @@ $response = \Apruvd\V4\APIAsyncResponseService::transactionResponse($json_object
 ```
 
 ## Authentication
-There are 2 viable authentication patterns for the v3 API. secret id/key and refresh/access tokens.
-#### Secret ID/Key
-This key pair is generated in the application settings page and is used as a basic authentication scheme. All calls can be made using this key key set. The refresh/access token authentication method is completely optional
-#### Refresh/Access Tokens
-Using your secret id/key you can request a refresh token using the following method:
+There are 2 viable authentication patterns for the v4 API, API Keys and OAuth 2.0
+#### API Keys
+Consisting of a key/secret pairthat is generated in the application settings page. Used as a basic authentication scheme. All calls can be made using this key key set - using the OAuth 2.0 flow is completely option
+#### OAuth 2.0
+This method uses two tokens, an access token and a refresh token.  Using your API Key, you can get a refresh token.  You can then use that token to create an access token, which should then be used during requests to authenticate.  Note that access tokens expire more quickly than refresh tokens, but both will expire in time.
+
+Using your API Key you can programatically request a refresh token using the following method:
 ```
 $token = $service->createMerchantRefreshToken();
 ```
