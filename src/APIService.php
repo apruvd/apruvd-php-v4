@@ -33,7 +33,7 @@ class APIService{
     /**
      * @var string $host
      */
-    private $host = 'https://v4-dev.apruvd.com/';
+    private $host = 'https://api.apruvd.com/';
     /**
      * @var string $merchant_id
      */
@@ -398,7 +398,7 @@ class APIService{
     }
 
     /**
-     * Read single Transaction (Order) by ID.
+     * Read single Transaction (Order) by Order ID.
      * @param string $id
      * @return ReadTransactionResponse
      */
@@ -410,6 +410,23 @@ class APIService{
         $apiResponse = new ReadTransactionResponse($response);
         if($this->retryNewToken($apiResponse)){
             $apiResponse = $this->readOrderByID($id);
+        }
+        return $apiResponse;
+    }
+
+    /**
+     * Read single Transaction (Order) by Transaction ID.
+     * @param string $id
+     * @return ReadTransactionResponse
+     */
+    public function readOrderByTransactionID($id){
+        $uri = "transactions/{$id}/";
+        $response = \Httpful\Request::get($this->host.$uri);
+        $response = $this->bindAuthorization($response);
+        $response = $response->sends(Mime::JSON)->send();
+        $apiResponse = new ReadTransactionResponse($response);
+        if($this->retryNewToken($apiResponse)){
+            $apiResponse = $this->readOrderByTransactionID($id);
         }
         return $apiResponse;
     }
@@ -433,6 +450,23 @@ class APIService{
     }
 
     /**
+     * Overwrite single Transaction (Order) by Transaction ID.
+     * @param Transaction $transaction
+     * @return UpsertTransactionResponse
+     */
+    public function updateOrderByTransactionID(Transaction $transaction){
+        $uri = "transactions/{$transaction->id}/";
+        $response = \Httpful\Request::put($this->host.$uri, json_encode($transaction));
+        $response = $this->bindAuthorization($response);
+        $response = $response->sends(Mime::JSON)->send();
+        $apiResponse = new UpsertTransactionResponse($response);
+        if($this->retryNewToken($apiResponse)){
+            $apiResponse = $this->updateOrderByTransactionID($transaction);
+        }
+        return $apiResponse;
+    }
+
+    /**
      * Update partial single Transaction (Order) by ID.
      * @param string $id
      * @param Transaction $transaction
@@ -446,6 +480,23 @@ class APIService{
         $apiResponse = new UpsertTransactionResponse($response);
         if($this->retryNewToken($apiResponse)){
             $apiResponse = $this->partialUpdateOrderByID($id, $transaction);
+        }
+        return $apiResponse;
+    }
+
+    /**
+     * Update partial single Transaction (Order) by Transaction ID.
+     * @param Transaction $transaction
+     * @return UpsertTransactionResponse
+     */
+    public function partialUpdateOrderByTransactionID(Transaction $transaction){
+        $uri = "transactions/{$transaction->id}/";
+        $response = \Httpful\Request::patch($this->host.$uri, json_encode($transaction));
+        $response = $this->bindAuthorization($response);
+        $response = $response->sends(Mime::JSON)->send();
+        $apiResponse = new UpsertTransactionResponse($response);
+        if($this->retryNewToken($apiResponse)){
+            $apiResponse = $this->partialUpdateOrderByTransactionID($transaction);
         }
         return $apiResponse;
     }
