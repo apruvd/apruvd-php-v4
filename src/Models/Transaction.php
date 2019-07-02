@@ -9,6 +9,10 @@ namespace Apruvd\V4\Models;
 class Transaction extends APIModel{
     // Settings
     /**
+     * @var string $id
+     */
+    public $id = null;
+    /**
      * @var string $order_id
      */
     public $order_id = null;
