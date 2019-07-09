@@ -249,7 +249,7 @@ class Transaction extends APIModel{
      * @var array $props
      */
     protected $props = [
-        'order_id','merchant_timestamp','mode','status','contact_email','contact_phone','tags',
+        'id','order_id','merchant_timestamp','mode','status','contact_email','contact_phone','tags',
         'customer_id','email','called_from','billing_phone','shipping_phone','egc_recipient','ip_address','referer_uri',
         'affiliate_id','subaffiliate_id','accept_language','user_agent','browser_width','browser_height','total',
         'total_currency','payment_type','iin','last_four','cardholder_name','cc_number_hash','avs_response','cvv_response',
@@ -300,7 +300,7 @@ class Transaction extends APIModel{
      * @var array $string_fields
      */
     protected $string_fields = [
-        'order_id','merchant_timestamp','contact_email','contact_phone','customer_id','email','called_from',
+        'id','order_id','merchant_timestamp','contact_email','contact_phone','customer_id','email','called_from',
         'billing_phone','shipping_phone','egc_recipient','ip_address','referer_uri',
         'affiliate_id','subaffiliate_id','accept_language','user_agent','browser_width','iin', 'last_four',
         'cardholder_name','cc_number_hash','avs_response','cvv_response',
