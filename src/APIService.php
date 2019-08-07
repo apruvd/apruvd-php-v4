@@ -576,6 +576,9 @@ class APIService{
         else{
             $request->addHeader('Authorization', 'Basic '.base64_encode($this->key_id.':'.$this->key_secret));
         }
+        
+        $request->addHeader('Accept', 'application/json');
+
         return $request;
     }
 
